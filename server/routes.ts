@@ -99,21 +99,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userProgressData.map(p => [p.questionId, p])
       );
 
-      // Prioritize questions that haven't been mastered
-      const unmasteredQuestions = allQuestions.filter(q => {
+      const now = new Date();
+      
+      // Categorize questions by priority
+      const dueForReview: typeof allQuestions = [];
+      const unmasteredNeverSeen: typeof allQuestions = [];
+      const unmasteredSeen: typeof allQuestions = [];
+      const mastered: typeof allQuestions = [];
+      
+      allQuestions.forEach(q => {
         const progress = progressMap.get(q.id);
-        return !progress || !progress.isMastered;
+        
+        if (!progress) {
+          // Never seen before
+          unmasteredNeverSeen.push(q);
+        } else if (progress.nextReviewDate && progress.nextReviewDate <= now) {
+          // Due for spaced repetition review
+          dueForReview.push(q);
+        } else if (!progress.isMastered) {
+          // Not mastered yet
+          unmasteredSeen.push(q);
+        } else {
+          // Mastered
+          mastered.push(q);
+        }
       });
 
-      // If all are mastered, use all questions
-      const questionsToStudy = unmasteredQuestions.length > 0 
-        ? unmasteredQuestions 
-        : allQuestions;
-
-      // Shuffle the questions
-      const shuffled = questionsToStudy.sort(() => Math.random() - 0.5);
+      // Priority order: due for review > never seen > unmastered > mastered
+      const questionsToStudy = [
+        ...dueForReview.sort(() => Math.random() - 0.5),
+        ...unmasteredNeverSeen.sort(() => Math.random() - 0.5),
+        ...unmasteredSeen.sort(() => Math.random() - 0.5),
+        ...mastered.sort(() => Math.random() - 0.5),
+      ];
       
-      res.json(shuffled);
+      res.json(questionsToStudy);
     } catch (error) {
       console.error("Error fetching study questions:", error);
       res.status(500).json({ message: "Failed to fetch questions" });
@@ -135,12 +155,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get current progress
       const currentProgress = await storage.getUserProgressForQuestion(userId, data.questionId);
       
-      // Update progress
+      // Update progress with spaced repetition
       const updated = await storage.updateUserProgress({
         userId,
         questionId: data.questionId,
         timesCorrect: (currentProgress?.timesCorrect || 0) + (data.correct ? 1 : 0),
         timesIncorrect: (currentProgress?.timesIncorrect || 0) + (data.correct ? 0 : 1),
+        isCorrect: data.correct,
       });
 
       res.json(updated);

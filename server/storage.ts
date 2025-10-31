@@ -16,7 +16,8 @@ import {
   type InsertBookmark,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, lte } from "drizzle-orm";
+import { calculateNextReview, determineQuality, isDueForReview } from "./spacedRepetition";
 
 export interface IStorage {
   // User operations (mandatory for Replit Auth)
@@ -111,20 +112,37 @@ export class DatabaseStorage implements IStorage {
     return progress;
   }
 
-  async updateUserProgress(data: InsertUserProgress): Promise<UserProgress> {
+  async updateUserProgress(data: InsertUserProgress & { isCorrect?: boolean }): Promise<UserProgress> {
     const existing = await this.getUserProgressForQuestion(data.userId, data.questionId);
 
     if (existing) {
       const timesCorrect = data.timesCorrect !== undefined ? data.timesCorrect : existing.timesCorrect;
       const timesIncorrect = data.timesIncorrect !== undefined ? data.timesIncorrect : existing.timesIncorrect;
-      const isMastered = timesCorrect >= 3;
+      
+      // Calculate consecutive correct answers for SM-2
+      let consecutiveCorrect = existing.timesCorrect;
+      if (data.isCorrect !== undefined) {
+        consecutiveCorrect = data.isCorrect ? timesCorrect : 0;
+      }
+      
+      // Use SM-2 algorithm to calculate next review
+      const quality = data.isCorrect !== undefined ? determineQuality(data.isCorrect) : 3;
+      const srResult = calculateNextReview(
+        quality,
+        existing.easeFactor,
+        existing.interval,
+        consecutiveCorrect
+      );
 
       const [updated] = await db
         .update(userProgress)
         .set({
           timesCorrect,
           timesIncorrect,
-          isMastered,
+          isMastered: srResult.isMastered,
+          easeFactor: srResult.easeFactor,
+          interval: srResult.interval,
+          nextReviewDate: srResult.nextReviewDate,
           lastAttemptedAt: new Date(),
           updatedAt: new Date(),
         })
@@ -132,12 +150,20 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return updated;
     } else {
+      // New question for user
+      const isCorrect = data.isCorrect !== undefined ? data.isCorrect : (data.timesCorrect || 0) > 0;
+      const quality = determineQuality(isCorrect);
+      const srResult = calculateNextReview(quality, 250, 0, isCorrect ? 1 : 0);
+      
       const [created] = await db.insert(userProgress).values({
         userId: data.userId,
         questionId: data.questionId,
         timesCorrect: data.timesCorrect || 0,
         timesIncorrect: data.timesIncorrect || 0,
-        isMastered: (data.timesCorrect || 0) >= 3,
+        isMastered: srResult.isMastered,
+        easeFactor: srResult.easeFactor,
+        interval: srResult.interval,
+        nextReviewDate: srResult.nextReviewDate,
         lastAttemptedAt: new Date(),
       }).returning();
       return created;

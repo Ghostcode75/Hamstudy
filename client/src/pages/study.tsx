@@ -13,6 +13,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { Question } from "@shared/schema";
+import { FCCReference } from "@/components/FCCReference";
 
 export default function Study() {
   const { toast } = useToast();
@@ -248,14 +249,25 @@ export default function Study() {
           )}
 
           {showExplanation && currentQuestion && (
-            <div className="mt-6 p-4 rounded-lg bg-muted">
-              <div className="flex items-start gap-2 mb-3">
-                <Lightbulb className="w-5 h-5 text-primary mt-0.5" />
-                <h3 className="font-semibold text-foreground">Explanation</h3>
+            <div className="mt-6 space-y-4">
+              <div className="p-4 rounded-lg bg-muted">
+                <div className="flex items-start gap-2 mb-3">
+                  <Lightbulb className="w-5 h-5 text-primary mt-0.5" />
+                  <h3 className="font-semibold text-foreground">Explanation</h3>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-explanation">
+                  {currentQuestion.explanation}
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-explanation">
-                {currentQuestion.explanation}
-              </p>
+              
+              {currentQuestion.references && (
+                <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                  <FCCReference 
+                    reference={currentQuestion.references} 
+                    showDescription={true}
+                  />
+                </div>
+              )}
             </div>
           )}
         </CardContent>

@@ -58,11 +58,15 @@ export const userProgress = pgTable("user_progress", {
   timesIncorrect: integer("times_incorrect").notNull().default(0),
   lastAttemptedAt: timestamp("last_attempted_at"),
   isMastered: boolean("is_mastered").notNull().default(false), // 3+ correct in a row
+  easeFactor: integer("ease_factor").notNull().default(250), // SM-2 algorithm: 2.5 represented as 250
+  interval: integer("interval").notNull().default(0), // Days until next review
+  nextReviewDate: timestamp("next_review_date"), // When this question should be reviewed next
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("user_progress_user_idx").on(table.userId),
   index("user_progress_question_idx").on(table.questionId),
+  index("user_progress_next_review_idx").on(table.nextReviewDate),
 ]);
 
 // Study sessions table - tracks individual study sessions
