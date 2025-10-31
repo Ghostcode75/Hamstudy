@@ -16,6 +16,13 @@ A comprehensive web application for studying and preparing for the FCC Amateur R
 
 ## Recent Changes
 
+**October 31, 2025 - Critical Auth Fix:**
+- ✅ Fixed infinite loading spinner on landing page for unauthenticated users
+- ✅ Changed queryClient default queryFn to use `on401: "returnNull"` instead of `on401: "throw"`
+- ✅ Updated useAuth hook to properly handle null responses from 401 errors
+- ✅ Verified full authentication flow works: landing → login → dashboard → logout → landing
+- ✅ Added FCCReference component integration to study mode for showing regulation links
+
 **October 30, 2025 - Database Seeding & Bug Fixes:**
 - ✅ Downloaded and seeded complete official NCVEC 2022-2026 Technician question pool (411 questions)
 - ✅ Questions properly distributed across all 10 subelements (T0-T9)
